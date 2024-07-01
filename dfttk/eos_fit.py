@@ -15,10 +15,6 @@ It includes the following equations of state: 4-parameter Teter-Shang modified B
 and 4-parameter Morse.
 """
 
-# Standard library imports
-import os
-import sys
-
 # Related third party imports
 import numpy as np
 import pandas as pd
@@ -934,7 +930,7 @@ def murnaghan_equation(
     Returns:
         float | np.ndarray: energy
     """
-    
+
     energy = (
         E0
         - (B * V0) / (BP - 1)
@@ -1017,7 +1013,7 @@ def vinet_equation(
     Returns:
         float | np.ndarray: energy
     """
-    
+
     energy = (
         E0
         + (4 * B * V0) / (BP - 1) ** 2
@@ -1264,88 +1260,18 @@ def fit_to_all_eos(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     return eos_df, eos_parameters_df
 
 
-# TODO: review
-def convert_input_files_to_df(
-    input_files: list[str], left_col: str, right_col: str
-) -> pd.DataFrame:
-    """
-    The input_files should be a list of strings containing the file names of the input files
-
-    the name of each input files should end in'_x' where x is the config_name ex:
-        str_0, str_1, str_2, ...
-        volume_energy_0, volume_energy_1, volume_energy_2, ...
-
-    The contents of the input files should be organized as two columns separated by a space
-    and not contain any headers ex:
-        1.0 2.0
-        2.0 3.0
-        3.0 4.0
-        ...
-    the data reader is np.loadtxt()
-
-    left_col is the type of data in the left column ex: 'volume'
-    right_col is the type of data in the right column ex: 'energy'
-    """
-    df = pd.DataFrame(columns=["config", left_col, right_col])
-    for input_file in input_files:
-        config = os.path.splitext(os.path.basename(input_file))[0]
-        if "_" in config:
-            config = config.split("_")[-1]
-        data = np.loadtxt(input_file)
-        left_data = data[:, 0]
-        right_data = data[:, 1]
-        for i in range(len(left_data)):
-            df.loc[len(df)] = {
-                "config": config,
-                left_col: left_data[i],
-                right_col: right_data[i],
-            }
-    return df
-
-
-# TODO: review
-def select_data(df: pd.DataFrame, selection_dict: dict) -> pd.DataFrame:
-    """
-    Used to cherry pick data from a dataframe based on the config name and the volume rank
-    the selection_dict should be a dictionary with the following format:
-    selection_dict = {10: [0,1,2,3],
-                        11: [0,1,2,3],
-                        12: [0,1,2,3],
-                        ...}
-    where the keys are the config names and the values are the volumes 0=lowest
-    volume, 1=second lowest volume, etc.
-
-
-    """
-    # first rank the volumes from lowest to highest
-    df["volume_rank"] = df.groupby("config")["volume"].rank(method="dense").astype(int)
-    print(df)
-    selected_data = pd.DataFrame()  # Initialize selected_data variable
-    for config in selection_dict.keys():
-        for volume_rank in selection_dict[config]:
-            selected_data = pd.concat(
-                [
-                    selected_data,
-                    df[(df["config"] == config) & (df["volume_rank"] == volume_rank)],
-                ],
-                ignore_index=True,
-            )
-    return selected_data
-
-
-# TODO: review
+# TODO: Not sure if a list of dataframe will actually work. the function simply concats them all together
 def plot_mv(df: pd.DataFrame, show_fig: bool = True) -> go.Figure:
-    """
-    data may be a single pandas data frame or a list of pandas data frames
-    data may also be a list of input_file names as strings ex:
-        ['str_0', 'str_1', 'str_2', ...]
+    """Plot the magnetic moment vs volume
 
-    Not sure if a list of dataframe will actually work. the function simply
-    concats them all together # TODO: test this
+    Args:
+        df (pd.DataFrame): single pandas data frame or a list of pandas dataframes with columns ['config', '# of ion', 'volume', 'tot']
+        show_fig (bool, optional): Defaults to True.
 
-    df is a data frame with columns ['config', '# of ion', 'volume', 'tot']
-    breaks if missing these columns
+    Returns:
+        go.Figure: plotly figure
     """
+
     # Create a new dataframe where each 'mag_data' dataframe is associated with its corresponding 'volume' and 'config' values
     df_new = pd.concat(
         [
@@ -1368,7 +1294,6 @@ def plot_mv(df: pd.DataFrame, show_fig: bool = True) -> go.Figure:
         template="plotly_white",
     )
     fig.update_layout(xaxis_title="Volume [A^3]", yaxis_title="Magnetic Moment [mu_B]")
-
     fig.update_yaxes(nticks=10)
     fig.update_xaxes(nticks=10)
 
@@ -1475,7 +1400,6 @@ def assign_marker_symbols_to_configs(df: pd.DataFrame) -> dict:
     return config_symbols
 
 
-# TODO: highlight exact fitted function minimum using V0 and E0.
 def plot_ev(
     data,
     eos_fitting="BM4",
@@ -1483,8 +1407,6 @@ def plot_ev(
     per_atom=False,
     title=None,
     show_fig=True,
-    left_col="volume",
-    right_col="energy",
     cmap="plotly",
     marker_alpha=1,
     marker_size=10,
@@ -1493,8 +1415,7 @@ def plot_ev(
 
     Args:
         data (pandas.DataFrame, list of pandas.DataFrame, or list of str): Data must be a pandas
-        DataFrame, list of pandas DataFrames, or a list of input_file names as strings containing the
-        volumes, energies, and number of atoms of each configuration.
+        DataFrame or a list of pandas DataFrames.
         eos_fitting (str, optional): EOS name. Defaults to "BM4".
         highlight_minimum (bool, optional): Defaults to True.
         per_atom (bool, optional):Defaults to False.
@@ -1520,8 +1441,6 @@ def plot_ev(
     ):
         if isinstance(data[0], pd.DataFrame):
             df = pd.concat(data, ignore_index=True)
-        elif isinstance(data[0], str):
-            df = convert_input_files_to_df(data, left_col, right_col)
 
     else:
         raise ValueError(
@@ -1620,8 +1539,8 @@ def plot_ev(
                         np.where(eos_name_df["energies"].values[0] == min_energy)[0][0]
                     ]
 
-                    x = volume_at_min_energy
-                    y = min_energy
+                    x = eos_name_df["V0"].values[0]
+                    y = eos_name_df["E0"].values[0]
 
                     if per_atom:
                         num_atoms = eos_name_df["number_of_atoms"].values[0][0]
@@ -1647,91 +1566,6 @@ def plot_ev(
 
                 else:
                     raise ValueError("highlight_minimum must be True or False")
-
-            # TODO: Do we really need all?
-            elif eos_fitting == "all":
-                for eos_name in eos_config_df["EOS"].unique():
-                    eos_name_df = eos_config_df[eos_config_df["EOS"] == eos_name]
-
-                    if per_atom == False:
-                        fig.add_trace(
-                            go.Scatter(
-                                x=eos_name_df["volumes"].values[0],
-                                y=eos_name_df["energies"].values[0],
-                                mode="lines",
-                                name=f"{eos_name} fit",
-                                line=dict(width=1),
-                                legendgroup="eos",
-                                showlegend=False,
-                            )
-                        )
-
-                    elif per_atom == True:
-                        fig.add_trace(
-                            go.Scatter(
-                                x=eos_name_df["volumes"].values[0]
-                                / eos_name_df["number_of_atoms"].values[0][0],
-                                y=eos_name_df["energies"].values[0]
-                                / eos_name_df["number_of_atoms"].values[0][0],
-                                mode="lines",
-                                name=f"{eos_name} fit",
-                                line=dict(width=1),
-                                legendgroup="eos",
-                                showlegend=False,
-                            )
-                        )
-
-                    # Plot the minimum energy data point for each config from the fitting equation
-                    if highlight_minimum == True:
-                        min_energy = min(eos_name_df["energies"].values[0])
-                        volume_at_min_energy = eos_name_df["volumes"].values[0][
-                            np.where(eos_name_df["energies"].values[0] == min_energy)[
-                                0
-                            ][0]
-                        ]
-                        if per_atom == False:
-                            fig.add_trace(
-                                go.Scatter(
-                                    x=[volume_at_min_energy],
-                                    y=[min_energy],
-                                    mode="markers",
-                                    name=f"{eos_name} min energy",
-                                    marker=dict(
-                                        color="black", size=marker_size, symbol="cross"
-                                    ),
-                                    legendgroup="minimum",
-                                    showlegend=False,
-                                )
-                            )
-                        elif per_atom == True:
-                            fig.add_trace(
-                                go.Scatter(
-                                    x=[
-                                        volume_at_min_energy
-                                        / eos_name_df["number_of_atoms"].values[0][0]
-                                    ],
-                                    y=[
-                                        min_energy
-                                        / eos_name_df["number_of_atoms"].values[0][0]
-                                    ],
-                                    mode="markers",
-                                    name=f"{eos_name} min energy",
-                                    marker=dict(
-                                        color="black", size=marker_size, symbol="cross"
-                                    ),
-                                    legendgroup="minimum",
-                                    showlegend=False,
-                                )
-                            )
-
-            elif eos_fitting == None:
-                pass
-
-            else:
-                print(
-                    f"Warning: eos_fitting '{eos_fitting}' not found in eos_df. Skipping."
-                )
-                sys.exit(1)
 
     axis_params = dict(
         showline=True,
@@ -1849,9 +1683,6 @@ def plot_energy_difference(
         title=dict(text=title_text, font=dict(size=22, color="rgb(0,0,0)"))
     )
 
-    if show_fig:
-        fig.show()
-
     # Plot a horizontal line a y=0
     fig.add_shape(
         type="line",
@@ -1867,11 +1698,12 @@ def plot_energy_difference(
             dash="dash",
         ),
     )
+    if show_fig:
+        fig.show()
 
     return fig
 
 
-# TODO: review
 def plot_config_energy(
     df,
     max_rank=10000,
@@ -2018,7 +1850,6 @@ def plot_config_energy(
     return fig
 
 
-# TODO: review
 def plot_energy_histogram(df, nbins=None, show_fig=True):
     try:
         new_df = df.drop("# of ion", axis=1)
