@@ -7,7 +7,6 @@ import sys
 # Related third party imports
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from natsort import natsorted
 import matplotlib.pyplot as plt
 

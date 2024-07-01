@@ -244,7 +244,7 @@ def extract_input_mag_data(outcar_path: str = "OUTCAR") -> pd.DataFrame:
             caps_line = line.upper()
             if "MAGMOM" in caps_line:
                 return parse_magmom_line(line)
-        raise ValueError("No MAGMOM line found in OUTCAR")
+        raise ValueError("No MAGMOM line found in File")
                 
 
 
